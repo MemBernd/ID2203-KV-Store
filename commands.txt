@@ -1,0 +1,10 @@
+#cd:
+cd "C:\Users\Bernardo\Documents\projects\Distributed systems, advanced\ID2203-KV-Store"
+#bootstrap:
+java -jar server/target/scala-2.12/server.jar -p 50000
+#n1
+java -jar server/target/scala-2.12/server.jar -p 50001 -s localhost:50000
+#n2:
+java -jar server/target/scala-2.12/server.jar -p 50002 -s localhost:50000
+#client:
+java -jar client/target/scala-2.12/client.jar -p 51000 -s localhost:50000
