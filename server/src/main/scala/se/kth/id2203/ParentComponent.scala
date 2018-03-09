@@ -27,7 +27,7 @@ import se.kth.id2203.bootstrapping._
 import se.kth.id2203.detectors.{EPFD, EventuallyPerfectFailureDetector}
 import se.kth.id2203.kvstore.KVService
 import se.kth.id2203.messaging.PerfectP2PLink.PerfectLinkInit
-import se.kth.id2203.messaging.{PerfectLink, PerfectP2PLink}
+import se.kth.id2203.messaging.{BasicBroadcast, BestEffortBroadcast, PerfectLink, PerfectP2PLink}
 import se.kth.id2203.networking.NetAddress
 import se.kth.id2203.overlay._
 import se.sics.kompics.sl.{Init, _}
@@ -50,7 +50,8 @@ class ParentComponent extends ComponentDefinition {
 
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   val pl = create(classOf[PerfectP2PLink], PerfectLinkInit(self))
-  val eventualP = create(classOf[EPFD], Init[EPFD](self));
+  val eventualP = create(classOf[EPFD], Init[EPFD](self))
+  val beb = create(classOf[BasicBroadcast], Init.NONE)
 
   {
     connect[Timer](timer -> boot);
@@ -59,15 +60,17 @@ class ParentComponent extends ComponentDefinition {
     connect(Bootstrapping)(boot -> overlay);
     connect[Network](net -> overlay);
     connect[EventuallyPerfectFailureDetector](eventualP -> overlay)
+    connect[BestEffortBroadcast](beb -> overlay)
     // KV
     connect(Routing)(overlay -> kv);
     connect[Network](net -> kv);
-
+    //PerfectLink
     connect[Network](net -> pl)
-
     //evP
     connect[Timer](timer -> eventualP)
     connect(PerfectLink)( pl -> eventualP)
+    //Beb
+    connect(PerfectLink)(pl -> beb)
 
   }
 }

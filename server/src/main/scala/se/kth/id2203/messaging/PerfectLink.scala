@@ -6,7 +6,7 @@ import se.sics.kompics.network.{Address, Network, Transport}
 import se.sics.kompics.sl.{ComponentDefinition, _}
 import java.net.{InetAddress, InetSocketAddress}
 
-import se.kth.id2203.networking.{NetAddress, NetMessage, THeader, TMessage}
+import se.kth.id2203.networking.{NetAddress, NetMessage}
 
 
 case class PL_Deliver(src: NetAddress, payload: KompicsEvent) extends KompicsEvent;

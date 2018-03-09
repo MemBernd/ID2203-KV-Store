@@ -47,6 +47,17 @@ class LookupTable extends NodeAssignment with Serializable {
     case (acc, kv) => acc ++ kv._2
   }
 
+  def getNodes(part: Int): Set[NetAddress] = {
+    partitions(part).toSet
+  }
+
+  def getPartition(addr: NetAddress): Int = {
+    val value = partitions.find( p => p._2.toSet.contains(addr) )
+    if(value.isDefined)
+      return value.get._1
+    return 0
+  }
+
   override def toString(): String = {
     val sb = new StringBuilder();
     sb.append("LookupTable(\n");
@@ -61,11 +72,13 @@ object LookupTable {
   def generate(nodes: Set[NetAddress], part: Integer, repSize: Integer): LookupTable = {
     val lut = new LookupTable();
     val iter = nodes.toIterator
-    //assert(iter.size == part* repSize)
+    val res: Long = Integer.MAX_VALUE - Integer.MIN_VALUE;
+    //TODO replace static value with dynamically generated one
+    val  step = (4294967295L / part).toInt
     for (p <- 1.to(part)) {
       for ( rep <- 0.to(repSize - 1) ) {
-        println(s"$p in $rep with size")
-        lut.partitions += (  p * ( Integer.MAX_VALUE / part ) -> iter.next()  )
+        //println(s"$p in $rep with size")
+        lut.partitions += (  Integer.MIN_VALUE + ( p * step) -> iter.next()  )
       }
     }
     //lut.partitions ++= (0 -> nodes);

@@ -23,10 +23,12 @@
  */
 package se.kth.id2203.kvstore;
 
-import se.kth.id2203.networking._;
-import se.kth.id2203.overlay.Routing;
-import se.sics.kompics.sl._;
-import se.sics.kompics.network.Network;
+import se.kth.id2203.networking._
+import se.kth.id2203.overlay.Routing
+import se.sics.kompics.sl._
+import se.sics.kompics.network.Network
+
+import scala.collection.mutable;
 
 class KVService extends ComponentDefinition {
 
@@ -35,11 +37,34 @@ class KVService extends ComponentDefinition {
   val route = requires(Routing);
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
+  val store = mutable.HashMap.empty[String, Int]
+  fillMapInitial(cfg.getValue[Int]("id2203.project.prefillStore"))
   //******* Handlers ******
   net uponEvent {
     case NetMessage(header, op: Op) => handle {
       log.info("Got operation {}! Now implement me please :)", op);
-      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
+      val result = store.get(op.key)
+      if(result.isDefined)
+        trigger(NetMessage(self, header.src, op.response(OpCode.Ok)) -> net);
+      else
+        trigger(NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net);
+
+    }
+  }
+
+  def fillMapInitial(amount: Int): Unit = {
+    store += ( ("one", 1) )
+    store += ( ("two", 2) )
+    store += ( ("three", 3) )
+    store += ( ("four", 4) )
+    store += ( ("five", 5) )
+    store += ( ("six", 6) )
+    store += ( ("seven", 7) )
+    store += ( ("eight", 8) )
+    store += ( ("nine", 9) )
+    store += ( ("ten", 10) )
+    for (i <- 0.to(amount) ) {
+      store += ( ("test"+i, i) )
     }
   }
 }

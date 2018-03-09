@@ -48,9 +48,9 @@ class BootstrapServer extends ComponentDefinition {
   val timer = requires[Timer];
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
-  val bootThreshold = cfg.getValue[Int]("id2203.project.bootThreshold");
+  val replicationDegree = cfg.getValue[Int]("id2203.project.replicationDegree");
   val partitions = cfg.getValue[Int]("id2203.project.partitions")
-  val neededNodes = bootThreshold * partitions;
+  val neededNodes = replicationDegree * partitions;
   private var state: State = Collecting;
   private var timeoutId: Option[UUID] = None;
   private val active = mutable.HashSet.empty[NetAddress];
@@ -59,7 +59,7 @@ class BootstrapServer extends ComponentDefinition {
   //******* Handlers ******
   ctrl uponEvent {
     case _: Start => handle {
-      log.info("Starting bootstrap server on {}, waiting for {} nodes...", self, bootThreshold);
+      log.info("Starting bootstrap server on {}, waiting for {} nodes...", self, replicationDegree);
       val timeout: Long = (cfg.getValue[Long]("id2203.project.keepAlivePeriod") * 2l);
       val spt = new SchedulePeriodicTimeout(timeout, timeout);
       spt.setTimeoutEvent(BSTimeout(spt));

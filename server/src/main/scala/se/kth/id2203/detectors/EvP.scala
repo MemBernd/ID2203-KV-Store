@@ -61,12 +61,13 @@ class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
 
   epfd uponEvent {
     case Monitor(nodes) => handle {
+      //TODO change imp of timer; if this event is called a second time, a second timer event will be created instead of replacing the previous one
       startTimer(period)
       topology = nodes
-      alive = Set(topology: _*) - self;
-      suspected = Set[NetAddress]();
+      alive = Set(topology: _*)
+      suspected = Set[NetAddress]()
       seqnum = 0;
-      println(s"topology $topology")
+      //println(s"topology $topology")
     }
   }
 
@@ -84,9 +85,10 @@ class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
 
           suspected = suspected + p
           trigger(Suspect(p) -> epfd)
-          println(s"suspecting $p")
+          println(s"EvP. suspecting $p")
         } else if (alive.contains(p) && suspected.contains(p)) {
           suspected = suspected - p;
+          println(s"EvP. not suspecting $p")
           trigger(Restore(p) -> epfd);
         }
         trigger(PL_Send(p, HeartbeatRequest(seqnum)) -> pLink);

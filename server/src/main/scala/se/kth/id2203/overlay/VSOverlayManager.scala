@@ -29,8 +29,7 @@ import se.sics.kompics.sl._
 import se.sics.kompics.network.Network
 import se.sics.kompics.timer.Timer
 import se.kth.id2203.detectors.{EPFD, EventuallyPerfectFailureDetector, Monitor}
-import se.kth.id2203.messaging.PerfectP2PLink
-import se.kth.id2203.messaging.PerfectLink
+import se.kth.id2203.messaging._
 import se.kth.id2203.messaging.PerfectP2PLink.PerfectLinkInit
 import util.Random
 
@@ -53,23 +52,46 @@ class VSOverlayManager extends ComponentDefinition {
   val boot = requires(Bootstrapping);
   val net = requires[Network];
   val timer = requires[Timer];
-  val evP = requires[EventuallyPerfectFailureDetector];
+  val evP = requires[EventuallyPerfectFailureDetector]
+  val beb = requires[BestEffortBroadcast]
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
-  val bootThreshold = cfg.getValue[Int]("id2203.project.bootThreshold");
+  val replicationDegree = cfg.getValue[Int]("id2203.project.replicationDegree");
+
   val partitions = cfg.getValue[Int]("id2203.project.partitions")
+  var partition = 0
   private var lut: Option[LookupTable] = None;
+  private var replicationGroup: Set[NetAddress] = null;
+
   //******* Handlers ******
+
+  beb uponEvent {
+    case BEB_Deliver(src, payload) => handle {
+      println( s"received broadcast from $src with $payload")
+    }
+  }
+
   boot uponEvent {
     case GetInitialAssignments(nodes) => handle {
       log.info("Generating LookupTable...");
-      val lut = LookupTable.generate(nodes, partitions, bootThreshold);
+      val lut = LookupTable.generate(nodes, partitions, replicationDegree);
       logger.debug("Generated assignments:\n" + lut);
       trigger (new InitialAssignments(lut) -> boot);
     }
     case Booted(assignment: LookupTable) => handle {
       log.info("Got NodeAssignment, overlay ready.");
       lut = Some(assignment);
+
+      partition = assignment.getPartition(self)
+      assert(partition != 0)
+      replicationGroup = assignment.getNodes(partition)
+      println(s"$self: partition $partition replication group consist of: $replicationGroup")
+
+      //setup Beb for transmitting to all
+      trigger( Set_Topology(assignment.getNodes()) -> beb )
+      trigger( BEB_Broadcast( TEST(self + "said hi") ) -> beb )
+
+      //start Ev.P for all nodes in the LookupTable
       trigger( Monitor(assignment.getNodes().toList) -> evP )
 
     }
