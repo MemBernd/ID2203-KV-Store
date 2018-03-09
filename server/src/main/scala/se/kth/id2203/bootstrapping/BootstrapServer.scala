@@ -49,6 +49,8 @@ class BootstrapServer extends ComponentDefinition {
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   val bootThreshold = cfg.getValue[Int]("id2203.project.bootThreshold");
+  val partitions = cfg.getValue[Int]("id2203.project.partitions")
+  val neededNodes = bootThreshold * partitions;
   private var state: State = Collecting;
   private var timeoutId: Option[UUID] = None;
   private val active = mutable.HashSet.empty[NetAddress];
@@ -72,13 +74,13 @@ class BootstrapServer extends ComponentDefinition {
       state match {
         case Collecting => {
           log.info("{} hosts in active set.", active.size);
-          if (active.size >= bootThreshold) {
+          if (active.size >= neededNodes) {
             bootUp();
           }
         }
         case Seeding => {
           log.info("{} hosts in ready set.", ready.size);
-          if (ready.size >= bootThreshold) {
+          if (ready.size >= neededNodes) {
             log.info("Finished seeding. Bootstrapping complete.");
             initialAssignment match {
               case Some(assignment) => {

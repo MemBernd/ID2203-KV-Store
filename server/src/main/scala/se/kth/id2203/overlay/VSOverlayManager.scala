@@ -23,12 +23,14 @@
  */
 package se.kth.id2203.overlay;
 
-import se.kth.id2203.bootstrapping._;
-import se.kth.id2203.networking._;
-import se.sics.kompics.sl._;
-import se.sics.kompics.network.Network;
-import se.sics.kompics.timer.Timer;
-import util.Random;
+import se.kth.id2203.bootstrapping._
+import se.kth.id2203.networking._
+import se.sics.kompics.sl._
+import se.sics.kompics.network.Network
+import se.sics.kompics.timer.Timer
+import util.Random
+
+import scala.util.Random;
 
 /**
  * The V(ery)S(imple)OverlayManager.
@@ -49,13 +51,15 @@ class VSOverlayManager extends ComponentDefinition {
   val timer = requires[Timer];
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
+  val bootThreshold = cfg.getValue[Int]("id2203.project.bootThreshold");
+  val partitions = cfg.getValue[Int]("id2203.project.partitions")
   private var lut: Option[LookupTable] = None;
   //******* Handlers ******
   boot uponEvent {
     case GetInitialAssignments(nodes) => handle {
       log.info("Generating LookupTable...");
-      val lut = LookupTable.generate(nodes);
-      logger.debug("Generated assignments:\n$lut");
+      val lut = LookupTable.generate(nodes, partitions, bootThreshold);
+      logger.debug("Generated assignments:\n" + lut);
       trigger (new InitialAssignments(lut) -> boot);
     }
     case Booted(assignment: LookupTable) => handle {
