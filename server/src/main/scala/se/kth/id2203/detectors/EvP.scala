@@ -1,5 +1,6 @@
-import se.kth.edx.id2203.core.Ports._
-import se.kth.edx.id2203.validation._
+package se.kth.id2203.detectors
+import se.kth.id2203.messaging._
+import se.kth.id2203.networking.NetAddress
 import se.sics.kompics.network._
 import se.sics.kompics.sl.{Init, _}
 import se.sics.kompics.timer.{ScheduleTimeout, Timeout, Timer}
@@ -8,38 +9,42 @@ import se.sics.kompics.{KompicsEvent, Start, ComponentDefinition => _, Port => _
 
 
 class EventuallyPerfectFailureDetector extends Port {
- indication[Suspect];
- indication[Restore];
+  indication[Suspect];
+  indication[Restore];
+  request[Monitor]
 }
 
 case class Suspect(process: Address) extends KompicsEvent;
 case class Restore(process: Address) extends KompicsEvent;
+case class Monitor(nodes: List[NetAddress]) extends KompicsEvent
 
-  //Custom messages to be used in the internal component implementation
-  case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout);
+//Custom messages to be used in the internal component implementation
+case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout);
 
-  case class HeartbeatReply(seq: Int) extends KompicsEvent;
-  case class HeartbeatRequest(seq: Int) extends KompicsEvent;
-  
+case class HeartbeatReply(seq: Int) extends KompicsEvent;
+case class HeartbeatRequest(seq: Int) extends KompicsEvent;
+
 //Define EPFD Implementation
 class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
 
   //EPFD subscriptions
   val timer = requires[Timer];
-  val pLink = requires[PerfectLink];
+  val pLink = requires(PerfectLink);
   val epfd = provides[EventuallyPerfectFailureDetector];
 
   // EPDF component state and initialization
-  
+
   //configuration parameters
-  val self = epfdInit match {case Init(s: Address) => s};
-  val topology = cfg.getValue[List[Address]]("epfd.simulation.topology");
-  val delta = cfg.getValue[Long]("epfd.simulation.delay");
-  
+  val self  = epfdInit match {
+    case Init( s: NetAddress) => s
+  };
+  var topology = List[NetAddress]()
+  val delta = cfg.getValue[Long]("id2203.project.keepAlivePeriod");
+
   //mutable state
-  var period = cfg.getValue[Long]("epfd.simulation.delay");
-  var alive = Set(cfg.getValue[List[Address]]("epfd.simulation.topology"): _*);
-  var suspected = Set[Address]();
+  var period = delta
+  var alive = Set(topology: _*);
+  var suspected = Set[NetAddress]();
   var seqnum = 0;
 
   def startTimer(delay: Long): Unit = {
@@ -51,49 +56,56 @@ class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
   //EPFD event handlers
   ctrl uponEvent {
     case _: Start => handle {
-      seqnum = 0
-      alive = Set(cfg.getValue[List[Address]]("epfd.simulation.topology"): _*)
-      suspected = Set[Address]()
-      period = delta
+    }
+  }
+
+  epfd uponEvent {
+    case Monitor(nodes) => handle {
       startTimer(period)
+      topology = nodes
+      alive = Set(topology: _*) - self;
+      suspected = Set[NetAddress]();
+      seqnum = 0;
+      println(s"topology $topology")
     }
   }
 
   timer uponEvent {
     case CheckTimeout(_) => handle {
       if (!alive.intersect(suspected).isEmpty) {
-         period += delta
-        
+        period += delta
+
       }
-      
+
       seqnum = seqnum + 1;
-      
+
       for (p <- topology) {
         if (!alive.contains(p) && !suspected.contains(p)) {
-            
-           suspected = suspected + p
-           trigger(Suspect(p) -> epfd)
+
+          suspected = suspected + p
+          trigger(Suspect(p) -> epfd)
+          println(s"suspecting $p")
         } else if (alive.contains(p) && suspected.contains(p)) {
           suspected = suspected - p;
           trigger(Restore(p) -> epfd);
         }
         trigger(PL_Send(p, HeartbeatRequest(seqnum)) -> pLink);
       }
-      alive = Set[Address]();
+      alive = Set[NetAddress]();
       startTimer(period);
     }
   }
 
   pLink uponEvent {
     case PL_Deliver(src, HeartbeatRequest(seq)) => handle {
-        
-      trigger(PL_Send(src, HeartbeatReply(seq)) -> pLink); 
-      
+
+      trigger(PL_Send(src, HeartbeatReply(seq)) -> pLink);
+
     }
     case PL_Deliver(src, HeartbeatReply(seq)) => handle {
-        
+
       if (seq == seqnum || suspected.contains(src)) alive = alive + src
-      
+
     }
   }
 };

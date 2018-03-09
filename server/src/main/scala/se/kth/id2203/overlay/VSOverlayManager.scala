@@ -28,6 +28,10 @@ import se.kth.id2203.networking._
 import se.sics.kompics.sl._
 import se.sics.kompics.network.Network
 import se.sics.kompics.timer.Timer
+import se.kth.id2203.detectors.{EPFD, EventuallyPerfectFailureDetector, Monitor}
+import se.kth.id2203.messaging.PerfectP2PLink
+import se.kth.id2203.messaging.PerfectLink
+import se.kth.id2203.messaging.PerfectP2PLink.PerfectLinkInit
 import util.Random
 
 import scala.util.Random;
@@ -49,6 +53,7 @@ class VSOverlayManager extends ComponentDefinition {
   val boot = requires(Bootstrapping);
   val net = requires[Network];
   val timer = requires[Timer];
+  val evP = requires[EventuallyPerfectFailureDetector];
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   val bootThreshold = cfg.getValue[Int]("id2203.project.bootThreshold");
@@ -65,6 +70,8 @@ class VSOverlayManager extends ComponentDefinition {
     case Booted(assignment: LookupTable) => handle {
       log.info("Got NodeAssignment, overlay ready.");
       lut = Some(assignment);
+      trigger( Monitor(assignment.getNodes().toList) -> evP )
+
     }
   }
 
