@@ -8,6 +8,8 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import se.kth.id2203.networking.{NetAddress, NetMessage}
 
+import scala.concurrent.Await
+
 
 case class PL_Deliver(src: NetAddress, payload: KompicsEvent) extends KompicsEvent;
 case class PL_Send(dest: NetAddress, payload: KompicsEvent) extends KompicsEvent;
@@ -30,7 +32,7 @@ class PerfectP2PLink(pp2pInit: PerfectLinkInit) extends ComponentDefinition {
 
   pLink uponEvent {
     case PL_Send(dest, payload) => handle {
-      trigger(NetMessage(self, dest, payload) -> network);
+        trigger(NetMessage(self, dest, payload) -> network);
     }
   }
 

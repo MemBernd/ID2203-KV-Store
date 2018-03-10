@@ -24,13 +24,15 @@
 
 package se.kth.id2203.overlay
 
-import java.util.UUID;
+import java.util.UUID
+
+import se.kth.id2203.networking.NetAddress
 import se.sics.kompics.KompicsEvent;
 
 @SerialVersionUID(0x8621b49163f9b6b4L)
-case class ConnectAck(id: UUID, clusterSize: Int) extends KompicsEvent with Serializable;
+case class ConnectAck(id: UUID, cluster: List[NetAddress]) extends KompicsEvent with Serializable;
 
 @SerialVersionUID(0x2f2e7f2eef33e4bcL)
 case class Connect(id: UUID) extends KompicsEvent with Serializable {
-  def ack(clusterSize: Int): ConnectAck = ConnectAck(id, clusterSize);
+  def ack(cluster: List[NetAddress]): ConnectAck = ConnectAck(id, cluster);
 }

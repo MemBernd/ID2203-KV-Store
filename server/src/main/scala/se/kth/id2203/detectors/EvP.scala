@@ -81,10 +81,11 @@ class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
           log.debug(s"$self suspects $p")
           suspected = suspected + p
           trigger(Suspect(p) -> epfd)
-          println(s"EvP. suspecting $p")
+          //println(s"EvP. suspecting $p")
         } else if (alive.contains(p) && suspected.contains(p)) {
           suspected = suspected - p;
-          println(s"EvP. not suspecting $p")
+          //println(s"EvP. not suspecting $p")
+          log.debug(s"$self restored $p")
           trigger(Restore(p) -> epfd);
         }
         trigger(PL_Send(p, HeartbeatRequest(seqnum)) -> pLink);

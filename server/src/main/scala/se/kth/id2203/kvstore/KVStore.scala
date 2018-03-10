@@ -23,6 +23,9 @@
  */
 package se.kth.id2203.kvstore;
 
+import java.util.UUID
+
+import se.kth.id2203.detectors.{BLE_Leader, BallotLeaderElection}
 import se.kth.id2203.networking._
 import se.kth.id2203.overlay.Routing
 import se.sics.kompics.sl._
@@ -38,40 +41,69 @@ class KVService extends ComponentDefinition {
   val sc = requires[SequenceConsensus]
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
-  val store = mutable.HashMap.empty[String, Int]
+  val store = mutable.HashMap.empty[String, String]
+  val answer = mutable.HashMap.empty[UUID, NetAddress]
+  var leader: Option[NetAddress] = None;
   fillStoreInitial(cfg.getValue[Int]("id2203.project.prefillStore"))
   //******* Handlers ******
+
+
   net uponEvent {
     case NetMessage(header, op: Op) => handle {
-      log.info("Got operation {}! Now implement me please :)", op);
-      val result = store.get(op.key)
-      if(result.isDefined)
-        trigger(NetMessage(self, header.src, op.response(OpCode.Ok)) -> net);
-      else
-        trigger(NetMessage(self, header.src, op.response(OpCode.NotFound)) -> net);
-
+      log.info("Got operation {}!", op);
+      trigger(SC_Propose( op ) -> sc)
+      answer += ( op.id -> header.src)
     }
   }
 
   sc uponEvent {
-    case SC_Decide(value) => handle {
-      println(value + " was decided")
+    case SC_Decide(operation: Op) => handle {
+      log.debug(s"Operation $operation decided with list answers = $answer")
+      operation match {
+        case Op(_, c: Get, _ )=>  {
+
+          val result = store.get(c.key)
+          if(result.isDefined &&  answer.contains(operation.id))
+            trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.Ok, result)) -> net);
+          else if (answer.contains(operation.id))
+            trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.NotFound)) -> net);
+        }
+        case Op(_, c: Put, _ )=> {
+          store += ( c.key -> c.value )
+          if(answer.contains(operation.id))
+            trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.Ok)) -> net);
+        }
+        case Op(_, c: Cas, _ )=> {
+          if (store.contains(c.key) ) {
+            val result = store(c. key)
+            if ( c.oldValue == result ) {
+              store += (c.key -> c.newValue)
+              if (answer.contains(operation.id))
+                trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.Ok, Some(result))) -> net);
+            } else if (answer.contains(operation.id))
+              trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.ReferenceValuesIsNotCurrentValue)) -> net);
+          } else if (answer.contains(operation.id)) {
+              trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.NotFound)) -> net);
+          }
+        }
+      }
+
     }
   }
 
   def fillStoreInitial(amount: Int): Unit = {
-    store += ( ("one", 1) )
-    store += ( ("two", 2) )
-    store += ( ("three", 3) )
-    store += ( ("four", 4) )
-    store += ( ("five", 5) )
-    store += ( ("six", 6) )
-    store += ( ("seven", 7) )
-    store += ( ("eight", 8) )
-    store += ( ("nine", 9) )
-    store += ( ("ten", 10) )
+    store += ( ("one", "value1") )
+    store += ( ("two", "value2") )
+    store += ( ("three", "value3") )
+    store += ( ("four", "value4") )
+    store += ( ("five", "value5") )
+    store += ( ("six", "value6") )
+    store += ( ("seven", "value7") )
+    store += ( ("eight", "value8") )
+    store += ( ("nine", "value9") )
+    store += ( ("ten", "value10") )
     for (i <- 0.to(amount) ) {
-      store += ( ("test"+i, i) )
+      store += ( ("test"+i, "value" + i) )
     }
   }
 }

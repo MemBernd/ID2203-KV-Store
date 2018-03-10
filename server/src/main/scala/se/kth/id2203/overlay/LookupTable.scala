@@ -36,6 +36,7 @@ class LookupTable extends NodeAssignment with Serializable {
 
   def lookup(key: String): Iterable[NetAddress] = {
     val keyHash = key.hashCode();
+    //println(s"keyhash: $keyHash")
     val partition = partitions.floor(keyHash) match {
       case Some(k) => k
       case None    => partitions.lastKey

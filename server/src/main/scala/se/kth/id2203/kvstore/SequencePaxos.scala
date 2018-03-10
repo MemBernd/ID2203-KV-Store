@@ -21,10 +21,10 @@ class SequenceConsensus extends Port {
 
 
 
-case class SC_Propose(value: RSM_Command) extends KompicsEvent;
-case class SC_Decide(value: RSM_Command) extends KompicsEvent;
+case class SC_Propose(value: Operation) extends KompicsEvent;
+case class SC_Decide(value: Operation) extends KompicsEvent;
 
-trait RSM_Command
+
 
 
 
@@ -32,9 +32,9 @@ trait RSM_Command
 //Provided Primitives to use in your implementation
 
 case class Prepare(nL: Long, ld: Int, na: Long) extends KompicsEvent;
-case class Promise(nL: Long, na: Long, suffix: List[RSM_Command], ld: Int) extends KompicsEvent;
-case class AcceptSync(nL: Long, suffix: List[RSM_Command], ld: Int) extends KompicsEvent;
-case class Accept(nL: Long, c: RSM_Command) extends KompicsEvent;
+case class Promise(nL: Long, na: Long, suffix: List[Operation], ld: Int) extends KompicsEvent;
+case class AcceptSync(nL: Long, suffix: List[Operation], ld: Int) extends KompicsEvent;
+case class Accept(nL: Long, c: Operation) extends KompicsEvent;
 case class Accepted(nL: Long, m: Int) extends KompicsEvent;
 case class Decide(ld: Int, nL: Long) extends KompicsEvent;
 
@@ -62,25 +62,25 @@ class SequencePaxos extends ComponentDefinition {
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   var pi = Set[NetAddress]()
   var others = Set[NetAddress]()
-  val majority = (pi.size / 2) + 1;
+  var majority = (pi.size / 2) + 1;
 
-  var state = (FOLLOWER, UNKOWN);
+  var stateNode = (FOLLOWER, UNKOWN);
   var nL = 0l;
   var nProm = 0l;
   var leader: Option[NetAddress] = None;
   var na = 0l;
-  var va = List.empty[RSM_Command];
+  var va = List.empty[Operation];
   var ld = 0;
   // leader state
-  var propCmds = List.empty[RSM_Command];
+  var propCmds = List.empty[Operation];
   val las = mutable.Map.empty[NetAddress, Int];
   val lds = mutable.Map.empty[NetAddress, Int];
   var lc = 0;
-  val acks = mutable.Map.empty[NetAddress, (Long, List[RSM_Command])];
+  val acks = mutable.Map.empty[NetAddress, (Long, List[Operation])];
 
-  private def max( map: mutable.Map[NetAddress, (Long, List[RSM_Command])] ): (Long, List[RSM_Command]) = {
+  private def max( map: mutable.Map[NetAddress, (Long, List[Operation])] ): (Long, List[Operation]) = {
     var highestRound: Long = 0;
-    var v = List.empty[RSM_Command]
+    var v = List.empty[Operation]
     for ((_, tuple) <- map) {
       if( tuple._1 > highestRound ) {
         highestRound = tuple._1
@@ -101,9 +101,9 @@ class SequencePaxos extends ComponentDefinition {
         leader = Some ( l )
         nL = n
         if ( (self == l) && (nL > nProm) ) {
-          //println(s"$self: I am leader now")
-          state = (LEADER, PREPARE)
-          propCmds = List.empty[RSM_Command];
+          //println(s"$self: I am leader for $pi")
+          stateNode = (LEADER, PREPARE)
+          propCmds = List.empty[Operation];
           for (p <- pi) {
             las += ( (p, 0) )
           }
@@ -117,7 +117,7 @@ class SequencePaxos extends ComponentDefinition {
           lds += ( (self, ld) )
           nProm = nL
         } else {
-          state = (FOLLOWER, state._2)
+          stateNode = (FOLLOWER, stateNode._2)
         }
       }
     }
@@ -128,8 +128,8 @@ class SequencePaxos extends ComponentDefinition {
       //println(s"$self: received prepare from $p while my leader is $leader")
       if( nProm < np ) {
         nProm = np
-        state = (FOLLOWER, PREPARE)
-        var sfx: List[RSM_Command] = List.empty[RSM_Command]
+        stateNode = (FOLLOWER, PREPARE)
+        var sfx: List[Operation] = List.empty[Operation]
         if ( na >= n ) {
           sfx = suffix( va, ldp )
         }
@@ -137,15 +137,15 @@ class SequencePaxos extends ComponentDefinition {
       }
     }
     case PL_Deliver(a, Promise(n, na, sfxa, lda)) => handle {
-      if ((n == nL) && (state == (LEADER, PREPARE))) {
+      if ((n == nL) && (stateNode == (LEADER, PREPARE))) {
         acks += ( (a, (na, sfxa)) )
         lds += ( (a, lda) )
         if( acks.size == majority ) {
           val (k, sfx) = max( acks )
           va = prefix( va, ld ) ++ sfx ++ propCmds
           las( self ) = va.size
-          propCmds = List.empty[RSM_Command]
-          state = (LEADER, ACCEPT)
+          propCmds = List.empty[Operation]
+          stateNode = (LEADER, ACCEPT)
           for ((p, v) <- lds ) {
             if( p != self ) {
               val sfxp = suffix( va, v)
@@ -153,7 +153,7 @@ class SequencePaxos extends ComponentDefinition {
             }
           }
         }
-      } else if ( ( n == nL ) && ( state == (LEADER, ACCEPT) ) ) {
+      } else if ( ( n == nL ) && ( stateNode == (LEADER, ACCEPT) ) ) {
         lds += ( (a, lda) )
         val sfx = suffix( va, lds( a ) )
         trigger( PL_Send( a, AcceptSync( nL, sfx, lds ( a ) ) ) -> pl )
@@ -163,15 +163,15 @@ class SequencePaxos extends ComponentDefinition {
       }
     }
     case PL_Deliver(p, AcceptSync(nL, sfx, ldp)) => handle {
-      if ((nProm == nL) && (state == (FOLLOWER, PREPARE))) {
+      if ((nProm == nL) && (stateNode == (FOLLOWER, PREPARE))) {
         na = nL
         va = prefix( va, ldp ) ++ sfx
         trigger( PL_Send( p, Accepted( nL, va.size ) ) -> pl )
-        state = (FOLLOWER, ACCEPT)
+        stateNode = (FOLLOWER, ACCEPT)
       }
     }
     case PL_Deliver(p, Accept(nL, c)) => handle {
-      if ((nProm == nL) && (state == (FOLLOWER, ACCEPT))) {
+      if ((nProm == nL) && (stateNode == (FOLLOWER, ACCEPT))) {
         //if(va.size < 10) println(s"$self: received accept with value $c from $p")
         va = va :+ c
         trigger( PL_Send( p, Accepted( nL, va.size ) ) -> pl )
@@ -187,7 +187,7 @@ class SequencePaxos extends ComponentDefinition {
       }
     }
     case PL_Deliver(a, Accepted(n, m)) => handle {
-      if ((n == nL) && (state == (LEADER, ACCEPT))) {
+      if ((n == nL) && (stateNode == (LEADER, ACCEPT))) {
         las( a ) = m
         if ( ( lc < m) && ( pi.filter( p => las( p ) >= m ).size >= majority ) ) {
           lc = m
@@ -203,10 +203,10 @@ class SequencePaxos extends ComponentDefinition {
   sc uponEvent {
     case SC_Propose(c) => handle {
 
-      if (state == (LEADER, PREPARE)) {
+      if (stateNode == (LEADER, PREPARE)) {
         propCmds = propCmds :+ c
       }
-      else if (state == (LEADER, ACCEPT)) {
+      else if (stateNode == (LEADER, ACCEPT)) {
         va = va :+ c
         las( self ) = las( self ) + 1
         //if(va.size < 10) println(s"$self: sending accept with value $c")
@@ -215,20 +215,24 @@ class SequencePaxos extends ComponentDefinition {
             trigger( PL_Send( p, Accept( nL, c ) ) -> pl )
           }
         }
+      } else {
+        log.debug(s"Not leader; sending $c to $leader")
+        trigger( PL_Send( leader.get, c) -> pl)
       }
     }
     case Set_Topology(topology) => handle {
       pi = topology
       others = pi - self
+      majority = (pi.size / 2) + 1
       trigger(Monitor(pi.toList) -> ble)
     }
   }
 
-  def suffix(s: List[RSM_Command], l: Int): List[RSM_Command] = {
+  def suffix(s: List[Operation], l: Int): List[Operation] = {
     s.drop(l)
   }
 
-  def prefix(s: List[RSM_Command], l: Int): List[RSM_Command] = {
+  def prefix(s: List[Operation], l: Int): List[Operation] = {
     s.take(l)
   }
 }

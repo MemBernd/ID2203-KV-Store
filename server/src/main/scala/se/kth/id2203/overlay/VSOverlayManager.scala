@@ -81,7 +81,7 @@ class VSOverlayManager extends ComponentDefinition {
       trigger (new InitialAssignments(lut) -> boot);
     }
     case Booted(assignment: LookupTable) => handle {
-      log.info("Got NodeAssignment, overlay ready.");
+      log.info("Got NodeAssignment, overlay ready:" + assignment);
       lut = Some(assignment);
 
       partition = assignment.getPartition(self)
@@ -120,9 +120,9 @@ class VSOverlayManager extends ComponentDefinition {
     case NetMessage(header, msg: Connect) => handle {
       lut match {
         case Some(l) => {
-          log.debug("Accepting connection request from ${header.src}");
-          val size = l.getNodes().size;
-          trigger (NetMessage(self, header.src, msg.ack(size)) -> net);
+          log.debug(s"Accepting connection request from ${header.src}");
+          val nodes = l.getNodes().toList
+          trigger (NetMessage(self, header.src, msg.ack(nodes) ) -> net);
         }
         case None => log.info("Rejecting connection request from ${header.src}, as system is not ready, yet.");
       }
@@ -139,7 +139,10 @@ class VSOverlayManager extends ComponentDefinition {
 
   def routingTarget(key: String): NetAddress = {
     val nodes = lut.get.lookup(key).toSet.diff(suspected);
+    //log.debug(s"nodes to route to: $nodes")
     assert(!nodes.isEmpty);
+    if (nodes.contains(self))
+      return self
     val i = Random.nextInt(nodes.size);
     return nodes.drop(i).head;
   }

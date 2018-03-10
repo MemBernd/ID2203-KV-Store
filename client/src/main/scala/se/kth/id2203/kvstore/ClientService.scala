@@ -23,16 +23,18 @@
  */
 package se.kth.id2203.kvstore;
 
-import java.util.UUID;
-import se.kth.id2203.networking._;
+import java.util.UUID
 
-import se.kth.id2203.overlay._;
-import se.sics.kompics.sl._;
-import se.sics.kompics.{ Start, Kompics, KompicsEvent };
-import se.sics.kompics.network.Network;
-import se.sics.kompics.timer._;
-import collection.mutable;
-import concurrent.{ Promise, Future };
+import se.kth.id2203.networking._
+import se.kth.id2203.overlay._
+import se.sics.kompics.sl._
+import se.sics.kompics.{Kompics, KompicsEvent, Start}
+import se.sics.kompics.network.Network
+import se.sics.kompics.timer._
+
+import collection.mutable
+import concurrent.{Future, Promise}
+import scala.util.Random;
 
 case class ConnectTimeout(spt: ScheduleTimeout) extends Timeout(spt);
 case class OpWithPromise(op: Operation, promise: Promise[OpResponse] = Promise()) extends KompicsEvent;
@@ -48,6 +50,7 @@ class ClientService extends ComponentDefinition {
   private var connected: Option[ConnectAck] = None;
   private var timeoutId: Option[UUID] = None;
   private val pending = mutable.SortedMap.empty[UUID, Promise[OpResponse]];
+  var servers = List.empty[NetAddress]
 
   //******* Handlers ******
   ctrl uponEvent {
@@ -64,8 +67,9 @@ class ClientService extends ComponentDefinition {
   }
 
   net uponEvent {
-    case NetMessage(header, ack @ ConnectAck(id, clusterSize)) => handle {
-      log.info(s"Client connected to $server, cluster size is $clusterSize");
+    case NetMessage(header, ack @ ConnectAck(id, cluster)) => handle {
+      log.info(s"Client connected to $server, cluster size is ${cluster.size}");
+      servers = cluster
       if (id != timeoutId.get) {
         log.error("Received wrong response id! System may be inconsistent. Shutting down...");
         System.exit(1);
@@ -75,7 +79,7 @@ class ClientService extends ComponentDefinition {
       val tc = new Thread(c);
       tc.start();
     }
-    case NetMessage(header, or @ OpResponse(id, status)) => handle {
+    case NetMessage(header, or @ OpResponse(id, status, command, value)) => handle {
       log.debug(s"Got OpResponse: $or");
       pending.remove(id) match {
         case Some(promise) => promise.success(or);
@@ -99,9 +103,14 @@ class ClientService extends ComponentDefinition {
   loopbck uponEvent {
     case OpWithPromise(op, promise) => handle {
       val rm = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
-      trigger(NetMessage(self, server, rm) -> net);
+      trigger(NetMessage(self, randomServer(), rm) -> net);
       pending += (op.id -> promise);
     }
+  }
+
+  def randomServer(): NetAddress = {
+    val i = Random.nextInt(servers.size);
+    return servers(i)
   }
 
   def op(key: String, command: RSM_Command): Future[OpResponse] = {

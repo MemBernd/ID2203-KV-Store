@@ -42,6 +42,7 @@ object OpCode {
   case object Ok extends OpCode;
   case object NotFound extends OpCode;
   case object NotImplemented extends OpCode;
+  case object ReferenceValuesIsNotCurrentValue extends OpCode
 }
 
 trait OperationResponse extends KompicsEvent {
