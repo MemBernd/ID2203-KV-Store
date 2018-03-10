@@ -57,10 +57,9 @@ class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
   }
 
   epfd uponEvent {
-    case Set_Topology(nodes) => handle {
-      //TODO change imp of timer; if this event is called a second time, a second timer event will be created instead of replacing the previous one
+    case Monitor(nodes) => handle {
       startTimer(period)
-      topology = nodes.toList
+      topology = nodes
       alive = Set(topology: _*)
       suspected = Set[NetAddress]()
       seqnum = 0;
@@ -79,7 +78,7 @@ class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
 
       for (p <- topology) {
         if (!alive.contains(p) && !suspected.contains(p)) {
-
+          log.debug(s"$self suspects $p")
           suspected = suspected + p
           trigger(Suspect(p) -> epfd)
           println(s"EvP. suspecting $p")

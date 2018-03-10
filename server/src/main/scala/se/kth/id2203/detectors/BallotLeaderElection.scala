@@ -87,8 +87,8 @@ class GossipLeaderElection extends ComponentDefinition {
   }
 
   ble uponEvent {
-    case Set_Topology(t) => handle {
-      topology = t.toList
+    case Monitor(t) => handle {
+      topology = t
       majority = (topology.size / 2) + 1;
       startTimer(period);
     }

@@ -97,7 +97,7 @@ class SequencePaxos extends ComponentDefinition {
     case BLE_Leader(l, n) => handle {
       //println(s"$self: new leader event l = $l, n = $n")
       if ( n > nL ) {
-        //println(s"$self: new leader event n > $nL")
+        log.debug(s"$l is new leader")
         leader = Some ( l )
         nL = n
         if ( (self == l) && (nL > nProm) ) {
