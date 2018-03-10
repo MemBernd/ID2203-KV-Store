@@ -14,8 +14,8 @@ class EventuallyPerfectFailureDetector extends Port {
   request[Monitor]
 }
 
-case class Suspect(process: Address) extends KompicsEvent;
-case class Restore(process: Address) extends KompicsEvent;
+case class Suspect(process: NetAddress) extends KompicsEvent;
+case class Restore(process: NetAddress) extends KompicsEvent;
 case class Monitor(nodes: List[NetAddress]) extends KompicsEvent
 
 //Custom messages to be used in the internal component implementation

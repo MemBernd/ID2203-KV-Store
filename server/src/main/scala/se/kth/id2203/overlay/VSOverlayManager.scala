@@ -28,10 +28,9 @@ import se.kth.id2203.networking._
 import se.sics.kompics.sl._
 import se.sics.kompics.network.Network
 import se.sics.kompics.timer.Timer
-import se.kth.id2203.detectors.{EPFD, EventuallyPerfectFailureDetector, Monitor}
+import se.kth.id2203.detectors._
 import se.kth.id2203.messaging._
 import se.kth.id2203.messaging.PerfectP2PLink.PerfectLinkInit
-import util.Random
 
 import scala.util.Random;
 
@@ -60,8 +59,9 @@ class VSOverlayManager extends ComponentDefinition {
 
   val partitions = cfg.getValue[Int]("id2203.project.partitions")
   var partition = 0
-  private var lut: Option[LookupTable] = None;
-  private var replicationGroup: Set[NetAddress] = null;
+  var lut: Option[LookupTable] = None
+  var replicationGroup: Set[NetAddress] = null
+  var suspected = Set[NetAddress]();
 
   //******* Handlers ******
 
@@ -97,12 +97,18 @@ class VSOverlayManager extends ComponentDefinition {
     }
   }
 
+  evP uponEvent {
+    case Suspect(p) => handle {
+      suspected += p
+    }
+    case Restore(p) => handle {
+      suspected -= p
+    }
+  }
+
   net uponEvent {
     case NetMessage(header, RouteMsg(key, msg)) => handle {
-      val nodes = lut.get.lookup(key);
-      assert(!nodes.isEmpty);
-      val i = Random.nextInt(nodes.size);
-      val target = nodes.drop(i).head;
+      val target = routingTarget(key)
       log.info(s"Forwarding message for key $key to $target");
       trigger(NetMessage(header.src, target, msg) -> net);
     }
@@ -120,12 +126,16 @@ class VSOverlayManager extends ComponentDefinition {
 
   route uponEvent {
     case RouteMsg(key, msg) => handle {
-      val nodes = lut.get.lookup(key);
-      assert(!nodes.isEmpty);
-      val i = Random.nextInt(nodes.size);
-      val target = nodes.drop(i).head;
+      val target = routingTarget(key)
       log.info(s"Routing message for key $key to $target");
       trigger (NetMessage(self, target, msg) -> net);
     }
+  }
+
+  def routingTarget(key: String): NetAddress = {
+    val nodes = lut.get.lookup(key).toSet.diff(suspected);
+    assert(!nodes.isEmpty);
+    val i = Random.nextInt(nodes.size);
+    return nodes.drop(i).head;
   }
 }
