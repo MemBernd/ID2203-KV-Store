@@ -29,11 +29,12 @@ import se.sics.kompics.KompicsEvent;
 trait Operation extends KompicsEvent {
   def id: UUID;
   def key: String;
+  def command: RSM_Command
 }
 
 @SerialVersionUID(0xfacc6612da2139eaL)
-case class Op(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
-  def response(status: OpCode.OpCode): OpResponse = OpResponse(id, status);
+case class Op(key: String, command: RSM_Command, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
+  def response(status: OpCode.OpCode, value: Option[String] = None): OpResponse = OpResponse(id, status, command, value);
 }
 
 object OpCode {
@@ -46,7 +47,18 @@ object OpCode {
 trait OperationResponse extends KompicsEvent {
   def id: UUID;
   def status: OpCode.OpCode;
+  def command: RSM_Command
+  def value(): Option[String]
 }
 
 @SerialVersionUID(0x0227a2aea45e5e75L)
-case class OpResponse(id: UUID, status: OpCode.OpCode) extends OperationResponse with Serializable;
+case class OpResponse(id: UUID, status: OpCode.OpCode, command: RSM_Command, value: Option[String]) extends OperationResponse with Serializable;
+
+
+trait RSM_Command {
+  def key:String
+}
+
+case class Get(key:String) extends RSM_Command
+case class Put(key:String, value: String) extends RSM_Command
+case class Cas(key:String, oldValue: String, newValue:String) extends RSM_Command

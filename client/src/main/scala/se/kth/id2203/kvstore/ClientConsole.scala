@@ -45,15 +45,37 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
 
   val opCommand = parsed(P("op" ~ " " ~ simpleStr), usage = "op <key>", descr = "Executes an op for <key>.") { key =>
     println(s"Op with $key");
+    executeCommand(key, Get(key))
 
-    val fr = service.op(key);
+  };
+
+  val getCommand = parsed(P("get" ~ " " ~ simpleStr), usage = "get <key>", descr = "Executes an get for <key>.") { arg =>
+    println(s"Get with $arg")
+    executeCommand(arg, Get(arg))
+  }
+
+  val putCommand = parsed(P("put" ~ " " ~ simpleStr ~ " " ~ simpleStr ), usage = "put <key> <value>", descr = "Executes an put for <key> <value>.") { args =>
+    println(s"Put with $args")
+      val (key, value) = args
+    executeCommand( key, Put( key, value ) )
+  }
+
+  val casCommand = parsed(P("cas" ~ " " ~ simpleStr ~ " " ~ simpleStr ~ " " ~ simpleStr  ), usage = "cas <key> <referenceValue> <newValue>", descr = "Executes an cas for <key> <referenceValue> <newValue>.") { args =>
+    println(s"CAS with $args")
+    val (key, referenceValue, newValue) = args
+    executeCommand( key, Cas( key, referenceValue, newValue ) )
+  }
+
+  def executeCommand(key: String, command: RSM_Command): Unit = {
+    val fr = service.op(key, command);
     out.println("Operation sent! Awaiting response...");
     try {
       val r = Await.result(fr, 5.seconds);
       out.println("Operation complete! Response was: " + r.status);
+      out.println("with result" + r.value)
     } catch {
       case e: Throwable => logger.error("Error during op.", e);
     }
-  };
+  }
 
 }
