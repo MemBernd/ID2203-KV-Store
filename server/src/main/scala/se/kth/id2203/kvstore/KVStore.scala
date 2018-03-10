@@ -35,10 +35,11 @@ class KVService extends ComponentDefinition {
   //******* Ports ******
   val net = requires[Network];
   val route = requires(Routing);
+  val sc = requires[SequenceConsensus]
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   val store = mutable.HashMap.empty[String, Int]
-  fillMapInitial(cfg.getValue[Int]("id2203.project.prefillStore"))
+  fillStoreInitial(cfg.getValue[Int]("id2203.project.prefillStore"))
   //******* Handlers ******
   net uponEvent {
     case NetMessage(header, op: Op) => handle {
@@ -52,7 +53,13 @@ class KVService extends ComponentDefinition {
     }
   }
 
-  def fillMapInitial(amount: Int): Unit = {
+  sc uponEvent {
+    case SC_Decide(value) => handle {
+      println(value + " was decided")
+    }
+  }
+
+  def fillStoreInitial(amount: Int): Unit = {
     store += ( ("one", 1) )
     store += ( ("two", 2) )
     store += ( ("three", 3) )

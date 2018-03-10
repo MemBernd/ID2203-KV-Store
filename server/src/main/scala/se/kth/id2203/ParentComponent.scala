@@ -24,8 +24,8 @@
 package se.kth.id2203;
 
 import se.kth.id2203.bootstrapping._
-import se.kth.id2203.detectors.{EPFD, EventuallyPerfectFailureDetector}
-import se.kth.id2203.kvstore.KVService
+import se.kth.id2203.detectors.{BallotLeaderElection, EPFD, EventuallyPerfectFailureDetector, GossipLeaderElection}
+import se.kth.id2203.kvstore.{KVService, SequenceConsensus, SequencePaxos}
 import se.kth.id2203.messaging.PerfectP2PLink.PerfectLinkInit
 import se.kth.id2203.messaging.{BasicBroadcast, BestEffortBroadcast, PerfectLink, PerfectP2PLink}
 import se.kth.id2203.networking.NetAddress
@@ -52,6 +52,8 @@ class ParentComponent extends ComponentDefinition {
   val pl = create(classOf[PerfectP2PLink], PerfectLinkInit(self))
   val eventualP = create(classOf[EPFD], Init[EPFD](self))
   val beb = create(classOf[BasicBroadcast], Init.NONE)
+  val sc = create(classOf[SequencePaxos], Init.NONE)
+  val ble = create(classOf[GossipLeaderElection], Init.NONE)
 
   {
     connect[Timer](timer -> boot);
@@ -64,6 +66,7 @@ class ParentComponent extends ComponentDefinition {
     // KV
     connect(Routing)(overlay -> kv);
     connect[Network](net -> kv);
+    connect[SequenceConsensus](sc -> kv)
     //PerfectLink
     connect[Network](net -> pl)
     //evP
@@ -71,6 +74,12 @@ class ParentComponent extends ComponentDefinition {
     connect(PerfectLink)( pl -> eventualP)
     //Beb
     connect(PerfectLink)(pl -> beb)
+    //BallotLeaderElection
+    connect[Timer](timer -> ble)
+    connect(PerfectLink)(pl -> ble)
+    //SequencePaxos
+    connect[BallotLeaderElection](ble -> sc)
+    connect(PerfectLink)(pl -> sc)
 
   }
 }

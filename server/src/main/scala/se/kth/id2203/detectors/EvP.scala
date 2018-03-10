@@ -16,10 +16,7 @@ class EventuallyPerfectFailureDetector extends Port {
 
 case class Suspect(process: NetAddress) extends KompicsEvent;
 case class Restore(process: NetAddress) extends KompicsEvent;
-case class Monitor(nodes: List[NetAddress]) extends KompicsEvent
 
-//Custom messages to be used in the internal component implementation
-case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout);
 
 case class HeartbeatReply(seq: Int) extends KompicsEvent;
 case class HeartbeatRequest(seq: Int) extends KompicsEvent;
@@ -60,10 +57,10 @@ class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
   }
 
   epfd uponEvent {
-    case Monitor(nodes) => handle {
+    case Set_Topology(nodes) => handle {
       //TODO change imp of timer; if this event is called a second time, a second timer event will be created instead of replacing the previous one
       startTimer(period)
-      topology = nodes
+      topology = nodes.toList
       alive = Set(topology: _*)
       suspected = Set[NetAddress]()
       seqnum = 0;
