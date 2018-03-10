@@ -23,17 +23,20 @@
  */
 package se.kth.id2203.kvstore
 
-import java.util.UUID;
+import java.util.UUID
+
+import se.kth.id2203.networking.NetAddress
 import se.sics.kompics.KompicsEvent;
 
 trait Operation extends KompicsEvent {
   def id: UUID;
   def key: String;
   def command: RSM_Command
+  def source: NetAddress
 }
 
 @SerialVersionUID(0xfacc6612da2139eaL)
-case class Op(key: String, command: RSM_Command, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
+case class Op(key: String, command: RSM_Command, source: NetAddress, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
   def response(status: OpCode.OpCode, value: Option[String] = None): OpResponse = OpResponse(id, status, command, value);
 }
 

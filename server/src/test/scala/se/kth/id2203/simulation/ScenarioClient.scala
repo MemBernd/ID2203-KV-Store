@@ -49,7 +49,7 @@ class ScenarioClient extends ComponentDefinition {
       val messages = SimulationResult[Int]("messages");
       for (i <- 0 to messages) {
         val key = s"test$i"
-        val op = new Op(key, Get(key));
+        val op = new Op(key, Get(key), self);
         val routeMsg = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
         trigger(NetMessage(self, server, routeMsg) -> net);
         pending += (op.id -> op.key);

@@ -50,7 +50,9 @@ class ClientService extends ComponentDefinition {
   private var connected: Option[ConnectAck] = None;
   private var timeoutId: Option[UUID] = None;
   private val pending = mutable.SortedMap.empty[UUID, Promise[OpResponse]];
+
   var servers = List.empty[NetAddress]
+  private val pendingServer = mutable.SortedMap.empty[UUID, NetAddress]
 
   //******* Handlers ******
   ctrl uponEvent {
@@ -103,8 +105,10 @@ class ClientService extends ComponentDefinition {
   loopbck uponEvent {
     case OpWithPromise(op, promise) => handle {
       val rm = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
-      trigger(NetMessage(self, randomServer(), rm) -> net);
+      val s = randomServer()
+      trigger(NetMessage(self, s, rm) -> net);
       pending += (op.id -> promise);
+      pendingServer += ( op.id -> s)
     }
   }
 
@@ -112,9 +116,14 @@ class ClientService extends ComponentDefinition {
     val i = Random.nextInt(servers.size);
     return servers(i)
   }
+  def removeServer(id: UUID): Unit = {
+    val s = pendingServer.remove(id)
+    if (s.isDefined)
+      servers.dropWhile(p => p == s.get)
+  }
 
   def op(key: String, command: RSM_Command): Future[OpResponse] = {
-    val op = Op(key, command);
+    val op = Op(key, command, self);
     val owf = OpWithPromise(op);
     trigger(owf -> onSelf);
     owf.promise.future

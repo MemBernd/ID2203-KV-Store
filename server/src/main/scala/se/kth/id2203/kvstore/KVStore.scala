@@ -42,7 +42,6 @@ class KVService extends ComponentDefinition {
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   val store = mutable.HashMap.empty[String, String]
-  val answer = mutable.HashMap.empty[UUID, NetAddress]
   var leader: Option[NetAddress] = None;
   fillStoreInitial(cfg.getValue[Int]("id2203.project.prefillStore"))
   //******* Handlers ******
@@ -52,38 +51,35 @@ class KVService extends ComponentDefinition {
     case NetMessage(header, op: Op) => handle {
       log.info("Got operation {}!", op);
       trigger(SC_Propose( op ) -> sc)
-      answer += ( op.id -> header.src)
     }
   }
 
   sc uponEvent {
     case SC_Decide(operation: Op) => handle {
-      log.debug(s"Operation $operation decided with list answers = $answer")
+      log.info(s"Operation $operation decided")
       operation match {
-        case Op(_, c: Get, _ )=>  {
+        case Op(_, c: Get, src,  _ )=>  {
 
           val result = store.get(c.key)
-          if(result.isDefined &&  answer.contains(operation.id))
-            trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.Ok, result)) -> net);
-          else if (answer.contains(operation.id))
-            trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.NotFound)) -> net);
+          if(result.isDefined)
+            trigger(NetMessage(self, src, operation.response(OpCode.Ok, result)) -> net);
+          else
+            trigger(NetMessage(self, src, operation.response(OpCode.NotFound)) -> net);
         }
-        case Op(_, c: Put, _ )=> {
+        case Op(_, c: Put, src, _ )=> {
           store += ( c.key -> c.value )
-          if(answer.contains(operation.id))
-            trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.Ok)) -> net);
+            trigger(NetMessage(self, src, operation.response(OpCode.Ok)) -> net);
         }
-        case Op(_, c: Cas, _ )=> {
+        case Op(_, c: Cas, src, _ )=> {
           if (store.contains(c.key) ) {
             val result = store(c. key)
             if ( c.oldValue == result ) {
               store += (c.key -> c.newValue)
-              if (answer.contains(operation.id))
-                trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.Ok, Some(result))) -> net);
-            } else if (answer.contains(operation.id))
-              trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.ReferenceValuesIsNotCurrentValue)) -> net);
-          } else if (answer.contains(operation.id)) {
-              trigger(NetMessage(self, answer(operation.id), operation.response(OpCode.NotFound)) -> net);
+                trigger(NetMessage(self, src, operation.response(OpCode.Ok, Some(result))) -> net);
+            } else
+              trigger(NetMessage(self, src, operation.response(OpCode.ReferenceValuesIsNotCurrentValue)) -> net);
+          } else  {
+              trigger(NetMessage(self, src, operation.response(OpCode.NotFound)) -> net);
           }
         }
       }
