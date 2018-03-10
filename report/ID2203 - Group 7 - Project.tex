@@ -1,0 +1,82 @@
+\documentclass[a4paper]{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{lastpage}
+\usepackage{pgf}
+\usepackage{wrapfig}
+\usepackage{fancyvrb}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\pagestyle{fancy}
+
+\catcode`\_=\active
+\protected\def_#1_{\textit{#1}}
+
+% Create header and footer
+\headheight 27pt
+\pagestyle{fancyplain}
+\lhead{\footnotesize{Distributed Systems - Advanced, ID2203}}
+\chead{\footnotesize{Project}}
+\rhead{}
+\lfoot{}
+\cfoot{\thepage}
+\rfoot{}
+
+% Create title page
+\title{Distributed Key-Value Store}
+\subtitle{Distributed Systems - Advanced, ID2203}
+\author{Bernardo Gonzalez Riede \& Vinit Kumar Verma}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+%Introduction
+\section{Introduction}
+
+
+%Design choices
+\section{Design choices}
+
+
+%Implementation
+\section{Implementation}
+
+\subsection{Codebase}
+The scala codebase was used as a head start for the implementation.
+Figure \ref{fig:initial} shows the component diagram of the provided scala code base. 
+
+\begin{figure}[h!]
+  \begin{center}
+    \includegraphics[scale=0.4]{Component Diagram - Initial.png}
+    \caption{Component Hierarchy of the code template}
+    \label{fig:initial}
+  \end{center}
+\end{figure}
+
+\subsection{Added code}
+Figure \ref{fig:modified} shows only the added components and affected components from the template.
+
+\begin{figure}[h!]
+  \begin{center}
+    \includegraphics[scale=0.4]{Component Diagram - Modified.png}
+    \caption{Purview of the added components}
+    \label{fig:modified}
+  \end{center}
+\end{figure}
+
+%Testing
+\section{Testing}
+
+
+%Respon
+\section{Responsibilities}
+
+
+%Conclusion
+\section{Conclusion}
+
+
+\end{document}
