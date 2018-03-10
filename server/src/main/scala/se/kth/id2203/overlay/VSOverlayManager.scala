@@ -28,10 +28,10 @@ import se.kth.id2203.networking._
 import se.sics.kompics.sl._
 import se.sics.kompics.network.Network
 import se.sics.kompics.timer.Timer
-import se.kth.id2203.detectors.{EPFD, EventuallyPerfectFailureDetector, Monitor}
+import se.kth.id2203.detectors._
+import se.kth.id2203.kvstore.SequenceConsensus
 import se.kth.id2203.messaging._
 import se.kth.id2203.messaging.PerfectP2PLink.PerfectLinkInit
-import util.Random
 
 import scala.util.Random;
 
@@ -54,20 +54,22 @@ class VSOverlayManager extends ComponentDefinition {
   val timer = requires[Timer];
   val evP = requires[EventuallyPerfectFailureDetector]
   val beb = requires[BestEffortBroadcast]
+  val sc = requires[SequenceConsensus]
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   val replicationDegree = cfg.getValue[Int]("id2203.project.replicationDegree");
 
   val partitions = cfg.getValue[Int]("id2203.project.partitions")
   var partition = 0
-  private var lut: Option[LookupTable] = None;
-  private var replicationGroup: Set[NetAddress] = null;
+  var lut: Option[LookupTable] = None
+  var replicationGroup: Set[NetAddress] = null
+  var suspected = Set[NetAddress]();
 
   //******* Handlers ******
 
   beb uponEvent {
     case BEB_Deliver(src, payload) => handle {
-      println( s"received broadcast from $src with $payload")
+      log.info( s"received broadcast from $src with $payload")
     }
   }
 
@@ -75,7 +77,7 @@ class VSOverlayManager extends ComponentDefinition {
     case GetInitialAssignments(nodes) => handle {
       log.info("Generating LookupTable...");
       val lut = LookupTable.generate(nodes, partitions, replicationDegree);
-      logger.debug("Generated assignments:\n" + lut);
+      logger.debug("Generated assignments:\n");
       trigger (new InitialAssignments(lut) -> boot);
     }
     case Booted(assignment: LookupTable) => handle {
@@ -85,7 +87,7 @@ class VSOverlayManager extends ComponentDefinition {
       partition = assignment.getPartition(self)
       assert(partition != 0)
       replicationGroup = assignment.getNodes(partition)
-      println(s"$self: partition $partition replication group consist of: $replicationGroup")
+      log.debug(s"$self: partition $partition replication group consist of: $replicationGroup")
 
       //setup Beb for transmitting to all
       trigger( Set_Topology(assignment.getNodes()) -> beb )
@@ -94,15 +96,24 @@ class VSOverlayManager extends ComponentDefinition {
       //start Ev.P for all nodes in the LookupTable
       trigger( Monitor(assignment.getNodes().toList) -> evP )
 
+      //setup and start sequence consensus
+      trigger( Set_Topology(replicationGroup) -> sc)
+
+    }
+  }
+
+  evP uponEvent {
+    case Suspect(p) => handle {
+      suspected += p
+    }
+    case Restore(p) => handle {
+      suspected -= p
     }
   }
 
   net uponEvent {
     case NetMessage(header, RouteMsg(key, msg)) => handle {
-      val nodes = lut.get.lookup(key);
-      assert(!nodes.isEmpty);
-      val i = Random.nextInt(nodes.size);
-      val target = nodes.drop(i).head;
+      val target = routingTarget(key)
       log.info(s"Forwarding message for key $key to $target");
       trigger(NetMessage(header.src, target, msg) -> net);
     }
@@ -120,12 +131,16 @@ class VSOverlayManager extends ComponentDefinition {
 
   route uponEvent {
     case RouteMsg(key, msg) => handle {
-      val nodes = lut.get.lookup(key);
-      assert(!nodes.isEmpty);
-      val i = Random.nextInt(nodes.size);
-      val target = nodes.drop(i).head;
+      val target = routingTarget(key)
       log.info(s"Routing message for key $key to $target");
       trigger (NetMessage(self, target, msg) -> net);
     }
+  }
+
+  def routingTarget(key: String): NetAddress = {
+    val nodes = lut.get.lookup(key).toSet.diff(suspected);
+    assert(!nodes.isEmpty);
+    val i = Random.nextInt(nodes.size);
+    return nodes.drop(i).head;
   }
 }
