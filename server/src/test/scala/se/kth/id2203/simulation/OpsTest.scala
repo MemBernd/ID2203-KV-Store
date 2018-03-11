@@ -64,7 +64,7 @@ class OpsTest extends FlatSpec with Matchers {
     SimulationResult += ("messages" -> nMessages);
     simpleBootScenario.simulate(classOf[LauncherComp]);
     for (i <- 0 to nMessages) {
-      SimulationResult.get[String](s"test$i") should be (Some("NotImplemented"));
+      SimulationResult.get[String](s"test$i") should be (Some("Ok"));
       // of course the correct response should be Success not NotImplemented, but like this the test passes
     }
   }
@@ -122,7 +122,7 @@ object SimpleScenario {
     val startClients = raise(1, startClientOp, 1.toN).arrival(constant(1.second));
 
     startCluster andThen
-      10.seconds afterTermination startClients andThen
+      100.seconds afterTermination startClients andThen
       100.seconds afterTermination Terminate
   }
 
