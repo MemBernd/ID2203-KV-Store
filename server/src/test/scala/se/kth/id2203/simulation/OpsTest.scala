@@ -56,7 +56,7 @@ class OpsTest extends FlatSpec with Matchers {
   //    }
   //  }
 
-  "Simple Operations" should "not be implemented" in { // well of course eventually they should be implemented^^
+  "Simple Operations" should " be implemented" in { // well of course eventually they should be implemented^^
     val seed = 123l;
     JSimulationScenario.setSeed(seed);
     val simpleBootScenario = SimpleScenario.scenario(3);

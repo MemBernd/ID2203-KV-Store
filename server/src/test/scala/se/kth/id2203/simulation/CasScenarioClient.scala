@@ -49,21 +49,22 @@ class CasScenarioClient(init: Init[CasScenarioClient]) extends ComponentDefiniti
   //******* Handlers ******
   ctrl uponEvent {
     case _: Start => handle {
-      val messages = SimulationResult[Int]("messages");
-      val (prefix, prefixValue) = init match {
-        case Init(prefix: String, prefixValue: String) => (prefix, prefixValue)
-        case _ => ("test", "value")
+      val (prefix:String, prefixValue:String, prefixNewValue:String, messages:Int) = init match {
+        case Init(prefix: String, prefixValue: String, prefixNew:String, m: Int) => (prefix, prefixValue, prefixNew, m)
+        case Init(prefix: String, prefixValue: String, m: Int) => (prefix, prefixValue, "new", m)
+        case Init(prefix: String, prefixValue: String) => (prefix, prefixValue, "new", SimulationResult[Int]("messages"))
+        case _ => ("test", "value", SimulationResult[Int]("messages"))
       }
-      for (i <- 0 to messages) {
-        val key = prefix + i
-        val value = prefixValue + i
-        val op = new Op(key, Cas(key, value, "new"+i), self);
-        val routeMsg = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
-        trigger(NetMessage(self, server, routeMsg) -> net);
-        pending += (op.id -> op.key);
-        logger.info("Sending {}", op);
-        SimulationResult += (op.key -> "Sent");
+      if (messages == 1)  {
+        sendOp(prefix, prefixValue, prefixNewValue)
+      } else if (messages > 1) {
+        for (i <- 0 to messages) {
+          val key = prefix +""+ i
+          val value = prefixValue +"" +i
+          sendOp(key, value, prefixNewValue+""+i)
+        }
       }
+
     }
   }
 
@@ -76,5 +77,14 @@ class CasScenarioClient(init: Init[CasScenarioClient]) extends ComponentDefiniti
       }
     }
 
+  }
+
+  def sendOp(key:String, oldValue: String, newValue:String): Unit = {
+    val op = new Op(key, Cas(key, oldValue, newValue), self);
+    val routeMsg = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
+    trigger(NetMessage(self, server, routeMsg) -> net);
+    pending += (op.id -> op.key);
+    logger.info("Sending {}", op);
+    SimulationResult += (op.key -> "Sent");
   }
 }
