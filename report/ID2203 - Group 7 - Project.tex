@@ -48,12 +48,12 @@ The following points had to be covered:
 \item _GET_, _PUT_ and _CAS_ operations
 \end{itemize}
 
-%Design choices
+%Reasoning
 \section{Reasoning \& Motivation}
 
 \subsection{Distributed system model assumption}
 
-The model used is a combination of fail-silent and fail-noisy. On the small scale, i.e. in a replication group, the model is fail-silent while using a _Ballot Leader Election_. Fail-noisy is used on every node to have a global overview of suspected nodes.
+The model assumed is the fail-noisy one.
 The following sections will motivate the decision made.
 
 \subsubsection{Process/crash abstraction}
@@ -74,7 +74,11 @@ For this project it’s feasible to assume that a high amount of crashes is unli
 Being the abstraction mostly used during the course and guaranteeing exactly-once delivery, perfect links will be used for communication.
 
 \subsubsection{Timing assumptions}
-Running the nodes on the same machine can allow for a synchronous system, although a growing key value store might pose a problem. While it might be possible to use this model in the real world, accounting for uncertainty has to be included and so a partially synchronous system is a better fit.
+Running the nodes on the same machine can allow for a synchronous system, although a growing key value store might pose a problem in terms of computation time.
+On the other hand, an asynchronous system is very weak and there exists a stronger model with real world value.
+The partially asynchronous system is the model of the internet and the one used in the project.
+
+
 
 \subsection{Design choices}
 
@@ -85,7 +89,7 @@ During bootstrapping the bootstrap servers poses a single point of failure.
 It reads the replication degree and the amount of partions wanted from a configuration file and waits until enough nodes have checked in to be able to form the distibuted \& partitioned KV-store.
 It sends the generated lookup table to all nodes.
 
-Each node then extracts the list of nodes of its own partitions to start the BLE for the partition.
+Each node then extracts the list of nodes of its own partitions to start the _SequencePaxos_, which in turn starts the _BLE_, for the partition.
 Moreover, Ev.P is used to monitor all nodes in the system as to only provide a newly connected client only with a not suspected node as entry point
 
 \subsubsection{Partitioning}
@@ -94,22 +98,54 @@ This decision is the result of the provided code base which includes a _String.t
 
 \subsubsection{Replication}
 A shared memory abstraction is too weak to provide a compare and swap operation, therefore motivating the need of implementing a replicated state machine.
-This was done using the _SequencePaxos_ algorithm from the course.
+This was done using the _SequencePaxos_ algorithm from the course which is a leader-based sequence consensus.
 
 \subsubsection{Resilience}
-The planned resilience is f=2 and to have replication groups for every partition of 5 nodes, thus having always a correct quorum. 3 is normally a good value and maybe the value of f will be changed to 1 to be able to reduce the quorums to 3. This depends on the load each node places on the development machines during testing. 
+Google has mentioned that  _f = 3_ is a good value, providing enough resilience for a real world scenarion.
+Being a small scale project for learning purposes the decision fell upon _f = 1_ for development and test.
+Nonetheless the value can be changed in the configuration file.
 
 \subsubsection{Client}
 The client only needs to know one correct process to be able to use the service.
-It connects to one server, which in turn will return the address of a random node from the list of not suspected servers.
-From there on he will use that server as entry point  
-
+It connects to one server, which in turn will return a list of not suspected nodes at the time of connecting.
+The client may then go through the list or keep using the same node until an operation failes.
 
 
 
 
 %Implementation
 \section{Implementation}
+
+
+\subsection{Operation Invocation}
+As the saying goes: "A picture says more than a thousand words.", \ref{fig:invocation} shows the event flow from an operation invocation by a client until being included in the list of commands to agree upon.
+
+\begin{figure}[h!]
+  \begin{center}
+    \includegraphics[scale=0.4]{OperationFlowInvocation.png}
+    \caption{Flowchart of operation invocation}
+    \label{fig:invocation}
+  \end{center}
+\end{figure}
+
+\subsection{Operation  reply}
+Through the guarantees of the sequence consensus the KVstore safely executes an operation after a _SCDecide_ event.
+For the client to know be informed about the result, i.e. the reply to the invocation, several approaches exists.
+\begin{itemize}
+	\item Have the first receptor inside the responsible partition save the UUID + source IP of the operation. 
+	This allows to let only this node send a reply.
+	\item Have the leader send a reply since there will always be a leader once established unless _f \textgreater resilience_ .
+	\item Have all nodes in the partition send a reply
+\end{itemize}
+The first case allows for an omission of the reply should the receptor crash before sending the reply message although the operation might still be executed by the others.
+
+While the second case has the least amount of messages, the last option was implemented. 
+The client already has the functionality to ignore replies which it isn't waiting for.
+Moreover, the client removes  the pending entry when receiving a reply, thus ignoring duplicate replies which can be identified thanks to the UUID.
+Furthermore, it allows for testing cases to count the amount of replies received and comparing the results.
+Inconsistencies in the RSM or slow nodes could be detected by this.
+
+
 
 \subsection{Codebase}
 The scala codebase was used as a head start for the implementation.
@@ -138,7 +174,7 @@ This is thanks to the underlying usage of TCP which provides session based FIFO 
 \end{figure}
 
 The components from the exercises where copied for the most part, but refined in some ways to fit the use case.
-Especially regarding the starting of _Ev.P_ and _BLE_ since the nodes don't know the other nodes in their replication group until bootstrapping is finished.
+Especially regarding the starting of _Ev.P_ and _BLE_ since the nodes don't know the other nodes in their replication group until bootstrapping is finished which required the introduction of a _Monitor_ and _SetTopology_ events.
 
 
 %Testing
@@ -147,6 +183,7 @@ Especially regarding the starting of _Ev.P_ and _BLE_ since the nodes don't know
 
 %Respon
 \section{Responsibilities}
+The project started out with both members wanting to contribute in  the development but the decision was revisited later on to use the proposed division of labour to coding and testing.
 
 
 %Conclusion
