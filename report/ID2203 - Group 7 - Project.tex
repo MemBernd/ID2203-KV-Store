@@ -116,37 +116,6 @@ The client may then go through the list or keep using the same node until an ope
 %Implementation
 \section{Implementation}
 
-
-\subsection{Operation Invocation}
-As the saying goes: "A picture says more than a thousand words.", \ref{fig:invocation} shows the event flow from an operation invocation by a client until being included in the list of commands to agree upon.
-
-\begin{figure}[h!]
-  \begin{center}
-    \includegraphics[scale=0.4]{OperationFlowInvocation.png}
-    \caption{Flowchart of operation invocation}
-    \label{fig:invocation}
-  \end{center}
-\end{figure}
-
-\subsection{Operation  reply}
-Through the guarantees of the sequence consensus the KVstore safely executes an operation after a _SCDecide_ event.
-For the client to know be informed about the result, i.e. the reply to the invocation, several approaches exists.
-\begin{itemize}
-	\item Have the first receptor inside the responsible partition save the UUID + source IP of the operation. 
-	This allows to let only this node send a reply.
-	\item Have the leader send a reply since there will always be a leader once established unless _f \textgreater resilience_ .
-	\item Have all nodes in the partition send a reply
-\end{itemize}
-The first case allows for an omission of the reply should the receptor crash before sending the reply message although the operation might still be executed by the others.
-
-While the second case has the least amount of messages, the last option was implemented. 
-The client already has the functionality to ignore replies which it isn't waiting for.
-Moreover, the client removes  the pending entry when receiving a reply, thus ignoring duplicate replies which can be identified thanks to the UUID.
-Furthermore, it allows for testing cases to count the amount of replies received and comparing the results.
-Inconsistencies in the RSM or slow nodes could be detected by this.
-
-
-
 \subsection{Codebase}
 The scala codebase was used as a head start for the implementation.
 Figure \ref{fig:initial} shows the component diagram of the provided scala code base. 
@@ -176,18 +145,99 @@ This is thanks to the underlying usage of TCP which provides session based FIFO 
 The components from the exercises where copied for the most part, but refined in some ways to fit the use case.
 Especially regarding the starting of _Ev.P_ and _BLE_ since the nodes don't know the other nodes in their replication group until bootstrapping is finished which required the introduction of a _Monitor_ and _SetTopology_ events.
 
+\subsubsection{Configuration file}
+The configuration file was extended to hold more values related to the project:
+\begin{itemize}
+\item _replicationDegree_ = amount of nodes in a replication group
+\item _partitions_ = amount of partitions to create
+\item _prefillStore_ = how many values to prefill the KV-store
+\end{itemize}
+
+\subsection{Operation Invocation}
+As the saying goes: "A picture says more than a thousand words.", \ref{fig:invocation} shows the event flow from an operation invocation by a client until being included in the list of commands to agree upon.
+
+\begin{figure}[h!]
+  \begin{center}
+    \includegraphics[scale=0.4]{OperationFlowInvocation.png}
+    \caption{Flowchart of operation invocation}
+    \label{fig:invocation}
+  \end{center}
+\end{figure}
+
+\subsection{Operation  reply}
+Through the guarantees of the sequence consensus the KVstore safely executes an operation after a _SCDecide_ event.
+For the client to know be informed about the result, i.e. the reply to the invocation, several approaches exists.
+\begin{itemize}
+	\item Have the first receptor inside the responsible partition save the UUID + source IP of the operation. 
+	This allows to let only this node send a reply.
+	\item Have the leader send a reply since there will always be a leader once established unless _f \textgreater resilience_ .
+	\item Have all nodes in the partition send a reply
+\end{itemize}
+The first case allows for an omission of the reply should the receptor crash before sending the reply message although the operation might still be executed by the others.
+
+While the second case has the least amount of messages, the last option was implemented. 
+The client already has the functionality to ignore replies which it isn't waiting for.
+Moreover, the client removes  the pending entry when receiving a reply, thus ignoring duplicate replies which can be identified thanks to the UUID.
+Furthermore, it allows for testing cases to count the amount of replies received and comparing the results.
+Inconsistencies in the RSM or slow nodes can be detected by comparing the inconming results.
+
 
 %Testing
 \section{Testing}
+Testing was done using the kompics simulator library and based mostly on the provided example.
+
+\subsection{Operations}
+The simulations save the OpCodes from the _Operation_ class to determine what happened and to be able to differentiate between a value not found or, in the case of CAS, the referenceValue being incorrect. For this an additional OpCode has been incorporated.
+
+\subsubsection{Preloaded KV - GET}
+The kv store is filled on  startup with a pair _(test<i>, value<i>)_ for 0 \textless i \textless n, _n_ being a valued defined in the configuration file.
+The test tries to retrieve the prefilled values from the KV-Store
+
+\subsubsection{PUT \& CAS}
+The test for these include 3 different ways of trying them, especially the compare-and-swap one.
+PUT has no individual test, given it being the operation least likely to fail.  Besides not being implemented, it can only fail by the responsible replication group being unavailable.
+CAS is tested in three different ways:
+\begin{itemize}
+\item Fail by not finding the key 
+\item Fail by having an incorrect referenceValue
+\item Use PUT to insert certain values, afterwards expecting a successful CAS with the newly inserted value
+\end{itemize}
+
+\subsection{Replication}
+The replication test consist of two runs.
+
+First, a system of one partition and three nodes is created. 
+Afterwards the expected leader is killed and after some waiting the client tries to execute some GET operations.
+It is known that the bootstrap server will become leader through BLE while in a stable/legitimate state.
+Because there continues to exist a majority quorum, sequence consensus will advance as long as no other node crashes.
+
+The second run starts similar but kills two (out of three) nodes instead.
+The expected outcome is for the client to timeout the operation since there is no quorum and the sequence consensus won't proceed deciding on commands.
+
+\subsection{Linearizability}
+First and foremost, Linearizartion _LIN_ is compositional, i.e. if it is valid for one register it holds for the whole system.
+Additionally, for LIN to hold for each execution, a legal history S has to exists, such that
+\begin{itemize}
+\item S is equivalent to T \textbar xr
+\item S preserves the order of non-overlapping operations in said T
+\end{itemize}
 
 
-%Respon
-\section{Responsibilities}
-The project started out with both members wanting to contribute in  the development but the decision was revisited later on to use the proposed division of labour to coding and testing.
+To prove this, 3 test cases were created and testet:
+\begin{enumerate}
+\item Ow \textless Ow - using first a PUT and a CAS afterwards using the newly added value from PUT
+\item Or \textless OW - using a GET to retrieve a value and a CAS with the referenceValue again afterwards
+\item Ow \textless Or - using a PUT and a Get afterwards which needs to retrieve the value written
+\end{enumerate}
 
+The ability to use CAS helped to establish a connection between consequent writes to see that indeed they are executed sequentially if non overlapping.
 
 %Conclusion
 \section{Conclusion}
+Devevloping the application seemed overwhelming at the beginning of the course. 
+The most difficult part was to start, but after having looked at some of the content of the course it helped to understand the problem.
+
+The second obstacle was to prove linearizability which resulted arduous.
 
 
 \end{document}
