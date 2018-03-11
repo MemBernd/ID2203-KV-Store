@@ -36,7 +36,7 @@ import se.sics.kompics.timer.Timer
 
 import scala.collection.mutable;
 
-class PutScenarioClient(init: Init[PutScenarioClient]) extends ComponentDefinition {
+class GetReturnScenarioClient(init: Init[GetReturnScenarioClient]) extends ComponentDefinition {
 
   //******* Ports ******
   val net = requires[Network];
@@ -45,25 +45,15 @@ class PutScenarioClient(init: Init[PutScenarioClient]) extends ComponentDefiniti
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   val server = cfg.getValue[NetAddress]("id2203.project.bootstrap-address");
   private val pending = mutable.Map.empty[UUID, String];
+  var saveValueInstead: Boolean = false;
   //******* Handlers ******
   ctrl uponEvent {
     case _: Start => handle {
-      val (prefix:String , prefixValue:String, messages:Int) = init match {
-        case Init(prefix: String, prefixValue: String, m:Int) => (prefix, prefixValue, m)
-        case Init(prefix: String, prefixValue: String) => (prefix, prefixValue, SimulationResult[Int]("messages"))
-        case _ => ("test", "value", SimulationResult[Int]("messages"))
+      val (key, s) = init match {
+        case Init(key:String, saveValueInstead:Boolean ) => (key, saveValueInstead)
       }
-      println(" hello inside put")
-      if( messages == 1) {
-        sendOp(prefix, prefixValue)
-      } else {
-        for (i <- 0 to messages) {
-          val key = prefix + i
-          val value = prefixValue + i
-          sendOp(key, value);
-        }
-      }
-
+      saveValueInstead = s
+      sendOp(key)
     }
   }
 
@@ -71,17 +61,19 @@ class PutScenarioClient(init: Init[PutScenarioClient]) extends ComponentDefiniti
     case NetMessage(header, or @ OpResponse(id, status, command, value)) => handle {
       logger.debug(s"Got OpResponse: $or");
       pending.remove(id) match {
-        case Some(key) => SimulationResult += (key -> status.toString());
+        case Some(key) =>
+          var temp = status.toString()
+          if (saveValueInstead && value.isDefined)
+            temp = value.get
+          SimulationResult += (key -> temp);
         case None      => logger.warn(s"ID $id was not pending! Ignoring response.");
       }
     }
-
   }
 
-  def sendOp(key:String, value:String): Unit = {
-    val op = new Op(key, Put(key, value), self);
-    val routeMsg = RouteMsg(op.key, op);
-    println(" hello " + op)
+  def sendOp(key: String): Unit = {
+    val op = new Op(key, Get(key), self);
+    val routeMsg = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
     trigger(NetMessage(self, server, routeMsg) -> net);
     pending += (op.id -> op.key);
     logger.info("Sending {}", op);

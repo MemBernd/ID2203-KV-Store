@@ -34,7 +34,7 @@ class ResilienceTest extends FlatSpec with Matchers {
   //    }
   //  }
 
-  "Get" should "work after initial leader (out of 3) died" in {
+  "Get w/ 2/3 nodes" should "work after initial leader (out of 3) died" in {
     val seed = 123l;
     JSimulationScenario.setSeed(seed);
     val simpleBootScenario = GetScenario.scenarioWorking(3);
@@ -47,7 +47,7 @@ class ResilienceTest extends FlatSpec with Matchers {
     }
   }
 
-  "Get" should "not work after killing 2 out of 3 nodes" in {
+  "Get w/ 1/3" should "not work after killing 2 out of 3 nodes" in {
     val seed = 123l;
     JSimulationScenario.setSeed(seed);
     val simpleBootScenario = GetScenario.scenarioFailing(3);
@@ -130,8 +130,8 @@ object GetScenario {
 
     startCluster andThen
       20.seconds afterTermination killBootstrap andThen
-      100.seconds afterTermination startClients andThen
-      100.seconds afterTermination Terminate
+      60.seconds afterTermination startClients andThen
+      60.seconds afterTermination Terminate
   }
 
   def scenarioFailing(servers: Int): JSimulationScenario = {
@@ -142,7 +142,7 @@ object GetScenario {
 
     startCluster andThen
       20.seconds afterTermination killBootstrap andThen
-      100.seconds afterTermination startClients andThen
-      100.seconds afterTermination Terminate
+      60.seconds afterTermination startClients andThen
+      60.seconds afterTermination Terminate
   }
 }

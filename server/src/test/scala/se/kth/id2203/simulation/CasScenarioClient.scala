@@ -55,7 +55,13 @@ class CasScenarioClient(init: Init[CasScenarioClient]) extends ComponentDefiniti
         case Init(prefix: String, prefixValue: String) => (prefix, prefixValue, "new", SimulationResult[Int]("messages"))
         case _ => ("test", "value", SimulationResult[Int]("messages"))
       }
-      if (messages == 1)  {
+      if (messages == 1 && prefixValue != null)  {
+        val oldValue = SimulationResult.get[String](prefix)
+        if (oldValue.isDefined)
+          sendOp(prefix, oldValue.get, prefixNewValue)
+        else
+          SimulationResult += (prefix -> "key in SimulationResult expected, but not found")
+      } else if (messages == 1) {
         sendOp(prefix, prefixValue, prefixNewValue)
       } else if (messages > 1) {
         for (i <- 0 to messages) {
@@ -81,7 +87,8 @@ class CasScenarioClient(init: Init[CasScenarioClient]) extends ComponentDefiniti
 
   def sendOp(key:String, oldValue: String, newValue:String): Unit = {
     val op = new Op(key, Cas(key, oldValue, newValue), self);
-    val routeMsg = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
+    val routeMsg = RouteMsg(op.key, op);
+    println(" hello " + op)
     trigger(NetMessage(self, server, routeMsg) -> net);
     pending += (op.id -> op.key);
     logger.info("Sending {}", op);

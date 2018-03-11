@@ -70,6 +70,19 @@ class PutCasTest extends FlatSpec with Matchers {
     }
   }
 
+  "Put for several values" should "work" in {
+    val seed = 123l;
+    JSimulationScenario.setSeed(seed);
+    val putCasScenario = PutCasScenario.scenarioPut(3);
+    val res = SimulationResultSingleton.getInstance();
+    SimulationResult += ("messages" -> nMessages);
+    putCasScenario.simulate(classOf[LauncherComp]);
+    val key = PutCasScenario.key
+    for (i <- 0 to nMessages) {
+      SimulationResult.get[String](key+i) should be (Some("Ok"));
+    }
+  }
+
 
 
 }
@@ -98,11 +111,6 @@ object PutCasScenario {
   }
 
   private def isBootstrap(self: Int): Boolean = self == 1;
-
-  val killServer = Op { (server: Integer) =>
-    println(" killing " + intToServerAddress(server))
-    KillNode(intToServerAddress(server))
-  }
 
   val startServerOp = Op { (self: Integer) =>
 
@@ -138,8 +146,8 @@ object PutCasScenario {
     val startClients = raise(1, startClientCasNotFinding, 1.toN).arrival(constant(1.second));
 
     startCluster andThen
-      100.seconds afterTermination startClients andThen
-      100.seconds afterTermination Terminate
+      60.seconds afterTermination startClients andThen
+      60.seconds afterTermination Terminate
   }
 
   //incorrect cas value scenario
@@ -149,8 +157,8 @@ object PutCasScenario {
     val startClients = raise(1, startClientCasOldValueIncorrect, 1.toN).arrival(constant(1.second));
 
     startCluster andThen
-      100.seconds afterTermination startClients andThen
-      100.seconds afterTermination Terminate
+      60.seconds afterTermination startClients andThen
+      60.seconds afterTermination Terminate
   }
 
   val startClientCasOldValueIncorrect = Op { (self: Integer) =>
@@ -190,8 +198,18 @@ object PutCasScenario {
     val startClientsCas = raise(1, startClientCasAfterPut, 1.toN).arrival(constant(1.second));
 
     startCluster andThen
-      100.seconds afterTermination startClientsPut andThen
-      100.seconds afterTermination startClientsCas andThen
-      100.seconds afterTermination Terminate
+      60.seconds afterTermination startClientsPut andThen
+      60.seconds afterTermination startClientsCas andThen
+      60.seconds afterTermination Terminate
+  }
+
+  def scenarioPut(servers: Int): JSimulationScenario = {
+
+    val startCluster = raise(servers, startServerOp, 1.toN).arrival(constant(1.second));
+    val startClientsPut = raise(1, startClientPut, 1.toN).arrival(constant(1.second));
+
+    startCluster andThen
+      60.seconds afterTermination startClientsPut andThen
+      60.seconds afterTermination Terminate
   }
 }
