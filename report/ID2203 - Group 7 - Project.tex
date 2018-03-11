@@ -214,13 +214,30 @@ Because there continues to exist a majority quorum, sequence consensus will adva
 The second run starts similar but kills two (out of three) nodes instead.
 The expected outcome is for the client to timeout the operation since there is no quorum and the sequence consensus won't proceed deciding on commands.
 
-%Respon
-\section{Responsibilities}
-The project started out with both members wanting to contribute in  the development but the decision was revisited later on to use the proposed division of labour to coding and testing.
+\subsection{Linearizability}
+First and foremost, Linearizartion _LIN_ is compositional, i.e. if it is valid for one register it holds for the whole system.
+Additionally, for LIN to hold for each execution, a legal history S has to exists, such that
+\begin{itemize}
+\item S is equivalent to T \textbar xr
+\item S preserves the order of non-overlapping operations in said T
+\end{itemize}
 
+
+To prove this, 3 test cases were created and testet:
+\begin{enumerate}
+\item Ow \textless Ow - using first a PUT and a CAS afterwards using the newly added value from PUT
+\item Or \textless OW - using a GET to retrieve a value and a CAS with the referenceValue again afterwards
+\item Ow \textless Or - using a PUT and a Get afterwards which needs to retrieve the value written
+\end{enumerate}
+
+The ability to use CAS helped to establish a connection between consequent writes to see that indeed they are executed sequentially if non overlapping.
 
 %Conclusion
 \section{Conclusion}
+Devevloping the application seemed overwhelming at the beginning of the course. 
+The most difficult part was to start, but after having looked at some of the content of the course it helped to understand the problem.
+
+The second obstacle was to prove linearizability which resulted arduous.
 
 
 \end{document}
