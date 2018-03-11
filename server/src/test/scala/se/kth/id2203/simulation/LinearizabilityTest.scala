@@ -59,6 +59,18 @@ class LinearizabilityTest extends FlatSpec with Matchers {
     SimulationResult.get[String](key) should be (Some("Ok"));
   }
 
+  "LIN o(w) < o(r) " should "succed" in {
+    val seed = 123l;
+    JSimulationScenario.setSeed(seed);
+    val key = LinearizabilityScenario.keyOwOr
+    val value = LinearizabilityScenario.valueOwOr
+    val OrOw = LinearizabilityScenario.scenarioOwOr();
+    val res = SimulationResultSingleton.getInstance();
+    SimulationResult += ("messages" -> nMessages);
+    OrOw.simulate(classOf[LauncherComp])
+    SimulationResult.get[String](key) should be (Some("Ok"));
+  }
+
 }
 
 object LinearizabilityScenario {
@@ -127,7 +139,7 @@ object LinearizabilityScenario {
       "id2203.project.address" -> selfAddr,
       "id2203.project.bootstrap-address" -> intToServerAddress(2));
     println(" hello put" + key + " " + v)
-    StartNode(selfAddr, Init[PutScenarioClient](keyOwOw, valueOwOw, 1), conf);
+    StartNode(selfAddr, Init[PutClient](keyOwOw, valueOwOw, 1), conf);
   };
 
   val startClientCasAfterPut = Op { (self: Integer) =>
@@ -141,11 +153,11 @@ object LinearizabilityScenario {
 
   def scenarioOwOw(): JSimulationScenario = {
     val startCluster = raise(replicationDegree, startServerOp, 1.toN).arrival(constant(2.second));
-    val startClientPut = raise(1, startClientPut1, 1.toN).arrival(constant(1.second));
+    val startClientP = raise(1, startClientPut1, 1.toN).arrival(constant(1.second));
     val startClientCas = raise(2, startClientCasAfterPut, 2.toN).arrival(constant(1.second));
 
     startCluster andThen
-      60.seconds afterTermination startClientPut andThen
+      60.seconds afterTermination startClientP andThen
       60.seconds afterTermination startClientCas andThen
       60.seconds afterTermination Terminate
   }
@@ -157,6 +169,8 @@ object LinearizabilityScenario {
       "id2203.project.bootstrap-address" -> intToServerAddress(2));
     StartNode(selfAddr, Init[GetReturnScenarioClient](keyOrOw, true), conf);
   };
+
+
 
   val startClientCasAfterGet = Op { (self: Integer) =>
     val selfAddr = intToClientAddress(self)
@@ -177,6 +191,35 @@ object LinearizabilityScenario {
     startCluster andThen
       60.seconds afterTermination startClientGet andThen
       60.seconds afterTermination startClientCas andThen
+      60.seconds afterTermination Terminate
+  }
+
+  val startClientPut2 = Op { (self: Integer) =>
+    val selfAddr = intToClientAddress(self)
+    val conf = Map(
+      "id2203.project.address" -> selfAddr,
+      "id2203.project.bootstrap-address" -> intToServerAddress(2));
+    println(" hello put" + key + " " + v)
+    StartNode(selfAddr, Init[PutClient](keyOwOr, valueOwOr, 1), conf);
+  };
+
+  val startClientGet2 = Op { (self: Integer) =>
+    val selfAddr = intToClientAddress(self)
+    val conf = Map(
+      "id2203.project.address" -> selfAddr,
+      "id2203.project.bootstrap-address" -> intToServerAddress(2));
+    StartNode(selfAddr, Init[GetReturnScenarioClient](keyOwOr, false), conf);
+  };
+
+  def scenarioOwOr(): JSimulationScenario = {
+
+    val startCluster = raise(replicationDegree, startServerOp, 1.toN).arrival(constant(2.second));
+    val startClientPut = raise(1, startClientPut2, 1.toN).arrival(constant(1.second));
+    val startClientGet = raise(2, startClientGet2, 2.toN).arrival(constant(1.second));
+
+    startCluster andThen
+      60.seconds afterTermination startClientPut andThen
+      60.seconds afterTermination startClientGet andThen
       60.seconds afterTermination Terminate
   }
 
