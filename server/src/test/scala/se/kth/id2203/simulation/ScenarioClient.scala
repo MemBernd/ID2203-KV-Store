@@ -23,15 +23,18 @@
  */
 package se.kth.id2203.simulation;
 
-import java.util.UUID;
-import se.kth.id2203.kvstore._;
-import se.kth.id2203.networking._;
-import se.kth.id2203.overlay.RouteMsg;
+import java.util.UUID
+
+import se.kth.id2203.kvstore._
+import se.kth.id2203.networking._
+import se.kth.id2203.overlay.RouteMsg
 import se.sics.kompics.sl._
-import se.sics.kompics.Start;
-import se.sics.kompics.network.Network;
-import se.sics.kompics.timer.Timer;
-import se.sics.kompics.sl.simulator.SimulationResult;
+import se.sics.kompics.Start
+import se.sics.kompics.network.Network
+import se.sics.kompics.simulator.events.system.KillNodeEvent
+import se.sics.kompics.timer.Timer
+import se.sics.kompics.sl.simulator.SimulationResult
+
 import collection.mutable;
 
 class ScenarioClient extends ComponentDefinition {
@@ -64,7 +67,7 @@ class ScenarioClient extends ComponentDefinition {
       logger.debug(s"Got OpResponse: $or");
       pending.remove(id) match {
         case Some(key) => SimulationResult += (key -> status.toString());
-        case None      => logger.warn("ID $id was not pending! Ignoring response.");
+        case None      => logger.warn(s"ID $id was not pending! Ignoring response.");
       }
     }
   }
