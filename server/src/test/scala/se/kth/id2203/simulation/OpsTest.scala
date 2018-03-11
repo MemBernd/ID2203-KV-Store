@@ -37,7 +37,7 @@ import scala.concurrent.duration._
 
 class OpsTest extends FlatSpec with Matchers {
 
-  private val nMessages = 10;
+  private val nMessages = 100;
 
   //  "Classloader" should "be something" in {
   //    val cname = classOf[SimulationResultSingleton].getCanonicalName();
@@ -65,9 +65,9 @@ class OpsTest extends FlatSpec with Matchers {
     simpleBootScenario.simulate(classOf[LauncherComp]);
     for (i <- 0 to nMessages) {
       SimulationResult.get[String](s"test$i") should be (Some("Ok"));
-      // of course the correct response should be Success not NotImplemented, but like this the test passes
     }
   }
+
 
 }
 
